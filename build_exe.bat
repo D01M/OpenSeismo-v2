@@ -1,13 +1,23 @@
 @echo off
 title Build Seismic Disaster Tracker EXE
+set "PYTHON_CMD="
+where python >nul 2>nul && set "PYTHON_CMD=python"
+if not defined PYTHON_CMD where py >nul 2>nul && set "PYTHON_CMD=py"
+
+if not defined PYTHON_CMD (
+  echo Python was not found. Install Python 3 and enable "Add python.exe to PATH", then run this file again.
+  pause
+  exit /b 1
+)
+
 echo Installing requirements...
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install pyinstaller
+%PYTHON_CMD% -m pip install --upgrade pip
+%PYTHON_CMD% -m pip install -r requirements.txt
+%PYTHON_CMD% -m pip install pyinstaller
 
 echo.
 echo Building EXE...
-pyinstaller --onefile --name SeismicDisasterTracker --add-data "templates;templates" --add-data "static;static" app.py
+%PYTHON_CMD% -m PyInstaller --onefile --name SeismicDisasterTracker --add-data "templates;templates" --add-data "static;static" app.py
 
 echo.
 echo Done.

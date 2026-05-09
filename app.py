@@ -15,15 +15,17 @@ from flask import Flask, jsonify, request, render_template
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seismic_tracker")
 
+BASE_DIR = getattr(
+    sys,
+    "_MEIPASS",
+    os.path.abspath(os.path.dirname(__file__)),
+)
+
 def resource_path(relative_path: str) -> str:
     """
-    Works both in normal Python and PyInstaller onefile mode.
+    Resolve bundled app assets in normal Python and PyInstaller onefile mode.
     """
-    try:
-        base_path = sys._MEIPASS  # type: ignore[attr-defined]
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+    return os.path.join(BASE_DIR, relative_path)
 
 app = Flask(
     __name__,
