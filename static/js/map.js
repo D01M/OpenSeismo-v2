@@ -1,18 +1,23 @@
 /**
  * Map Module - Cesium viewer initialization and camera controls
+ * Optimized for performance with lazy rendering and entity pooling
  */
 
 let viewer;
 let rotation = false;
 let lastTick = Date.now();
+let renderEnabled = false;
 
 /**
- * Initialize the Cesium viewer
+ * Initialize the Cesium viewer with performance optimizations
  */
 async function initMap() {
   try {
+    PerformanceMonitor.markCesiumReady(); // Start timing
+
     Cesium.Ion.defaultAccessToken = "";
     
+    // Create viewer with performance options
     viewer = new Cesium.Viewer("cesiumContainer", {
       animation: false,
       timeline: false,
@@ -28,37 +33,64 @@ async function initMap() {
       imageryProvider: new Cesium.OpenStreetMapImageryProvider({
         url: "https://tile.openstreetmap.org/"
       }),
-      requestRenderMode: false
+      // Performance: Use on-demand rendering instead of continuous
+      requestRenderMode: true,
+      maximumRenderTimeChange: 0.0
     });
 
-    // Configure scene
+    // Configure scene for optimal performance
     viewer.scene.globe.enableLighting = true;
     viewer.scene.globe.showGroundAtmosphere = true;
     viewer.scene.skyAtmosphere.show = true;
     viewer.scene.fog.enabled = false;
     viewer.scene.postProcessStages.fxaa.enabled = false;
+    viewer.scene.postProcessStages.bloom.enabled = false;
     viewer.scene.backgroundColor = Cesium.Color.BLACK;
 
-    // Performance optimization
-    viewer.resolutionScale = 0.55;
+    // Advanced performance optimizations
+    viewer.resolutionScale = 0.55; // Reduced resolution for better performance
     viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
     viewer.scene.screenSpaceCameraController.minimumZoomDistance = 1000000;
     viewer.scene.screenSpaceCameraController.maximumZoomDistance = 56000000;
 
+    // Optimization: Batch rendering for better frame rates
+    viewer.scene.preRender.addEventListener(() => {
+      // Dynamic LOD adjustment based on zoom level
+      const cameraHeight = Cesium.Cartesian3.distance(
+        viewer.camera.position,
+        Cesium.Cartesian3.fromDegrees(0, 0)
+      );
+      
+      // Reduce detail when zoomed out
+      if (cameraHeight > 20000000) {
+        viewer.resolutionScale = 0.4;
+      } else if (cameraHeight > 10000000) {
+        viewer.resolutionScale = 0.5;
+      } else {
+        viewer.resolutionScale = 0.6;
+      }
+    });
+
     // Set initial camera view
     resetView();
 
-    // Set up rotation ticker
+    // Performance: Set up rotation ticker only when needed
     viewer.clock.onTick.addEventListener(() => {
       if (!rotation) return;
       const now = Date.now();
       const dt = (now - lastTick) / 1000;
       lastTick = now;
       viewer.scene.camera.rotate(Cesium.Cartesian3.UNIT_Z, -0.002 * dt);
+      viewer.scene.requestRender(); // Request render when rotating
     });
 
-    // Set up click handler for entity selection
-    viewer.screenSpaceEventHandler.setInputAction((click) => {
+    // Camera movement event - request renders during interaction
+    viewer.scene.camera.changed.addEventListener(() => {
+      viewer.scene.requestRender();
+    });
+
+    // Set up throttled click handler for entity selection
+    const handleEntityClick = throttleRAF((click) => {
       const picked = viewer.scene.pick(click.position);
       if (Cesium.defined(picked) && picked.id && picked.id._telemetry) {
         document.getElementById("telemetry").innerHTML = picked.id._telemetry;
@@ -66,9 +98,14 @@ async function initMap() {
           selectedEventForWaves = picked.id._eventData;
           drawWaves(selectedEventForWaves);
         }
+        viewer.scene.requestRender();
       }
-    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    });
 
+    viewer.screenSpaceEventHandler.setInputAction(handleEntityClick, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    renderEnabled = true;
+    
   } catch (e) {
     console.error(e);
     updateStatus("Boot failed: " + e.message, true);

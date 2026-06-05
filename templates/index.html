@@ -3,14 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Real-time seismic disaster tracking with live earthquake data from USGS">
+  <meta name="theme-color" content="#0b1627">
   <title>Seismic Disaster Tracker v6 Stable</title>
   
-  <!-- Cesium Resources -->
-  <script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js"></script>
+  <!-- Critical CSS - Inline to prevent render blocking -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; font-family: Arial, sans-serif; }
+    #cesiumContainer { width: 100%; height: 100%; position: relative; }
+    body { background: #000; color: #e2e8f0; overflow: hidden; }
+  </style>
+  
+  <!-- Cesium - Performance optimized -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js" defer></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   
   <!-- Application Styles -->
   <link rel="stylesheet" href="/static/css/style.css">
+  
+  <!-- Preload critical resources -->
+  <link rel="preload" href="/static/js/map.js" as="script">
+  <link rel="preload" href="/static/js/ui.js" as="script">
 </head>
 <body>
   <div id="cesiumContainer"></div>
@@ -95,11 +109,13 @@
 
   <div class="footer" id="statusText">Booting...</div>
 
-  <!-- Application Scripts -->
-  <script src="/static/js/map.js"></script>
-  <script src="/static/js/earthquakes.js"></script>
-  <script src="/static/js/tsunami.js"></script>
-  <script src="/static/js/stations.js"></script>
-  <script src="/static/js/ui.js"></script>
+  <!-- Application Scripts - Deferred for optimal loading -->
+  <!-- Loading order matters: performance → base map → data modules → ui orchestration -->
+  <script defer src="/static/js/performance.js"></script>
+  <script defer src="/static/js/map.js"></script>
+  <script defer src="/static/js/earthquakes.js"></script>
+  <script defer src="/static/js/tsunami.js"></script>
+  <script defer src="/static/js/stations.js"></script>
+  <script defer src="/static/js/ui.js"></script>
 </body>
 </html>

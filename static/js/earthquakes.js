@@ -1,5 +1,6 @@
 /**
  * Earthquakes Module - Earthquake data fetching and visualization
+ * Optimized with caching and lazy rendering
  */
 
 let quakeEntities = [];
@@ -17,12 +18,34 @@ function colorForMag(m) {
 }
 
 /**
- * Refresh earthquake data from API
+ * Refresh earthquake data from API with caching
  */
 async function refreshQuakes() {
   try {
+    const startTime = performance.now();
     const mag = parseFloat(document.getElementById("magFilter").value);
-    const data = await fetchJson(`/api/earthquakes?mag_filter=${mag}`);
+    const cacheKey = `earthquakes_${mag}`;
+
+    // Check cache first
+    let data = CacheManager.get(cacheKey);
+    
+    if (!data) {
+      // Fetch from API if not cached
+      const response = await Promise.race([
+        fetch(`/api/earthquakes?mag_filter=${mag}`),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API timeout')), 10000)
+        )
+      ]);
+      data = await response.json();
+      
+      // Cache the result (2 minute TTL for earthquake data)
+      CacheManager.set(cacheKey, data, 120000);
+    }
+
+    // Track API performance
+    const loadTime = performance.now() - startTime;
+    PerformanceMonitor.trackApiCall('earthquakes', loadTime);
     
     clearEntities(quakeEntities);
     let strong = 0;
