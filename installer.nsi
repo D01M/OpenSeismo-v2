@@ -19,8 +19,8 @@ Page instfiles
 Section "Install"
     SetOutPath "$INSTDIR"
     
-    ; Copy main executable
-    File "dist\OpenSeismo Lite.exe"
+    ; Copy entire application directory with all dependencies
+    File /r "dist\OpenSeismo Lite\*.*"
     
     ; Create shortcuts
     CreateDirectory "$SMPROGRAMS\OpenSeismo Lite"
@@ -38,23 +38,20 @@ Section "Install"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenSeismo Lite" "DisplayName" "OpenSeismo Lite"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenSeismo Lite" "UninstallString" "$INSTDIR\Uninstall.exe"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenSeismo Lite" "InstallLocation" "$INSTDIR"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenSeismo Lite" "DisplayVersion" "1.0.0"
     
 SectionEnd
 
 ; Uninstall section
 Section "Uninstall"
-    ; Delete files
-    Delete "$INSTDIR\OpenSeismo Lite.exe"
-    Delete "$INSTDIR\Uninstall.exe"
-    
     ; Delete shortcuts
     Delete "$SMPROGRAMS\OpenSeismo Lite\OpenSeismo Lite.lnk"
     Delete "$SMPROGRAMS\OpenSeismo Lite\Uninstall.lnk"
     RMDir "$SMPROGRAMS\OpenSeismo Lite"
     Delete "$DESKTOP\OpenSeismo Lite.lnk"
     
-    ; Delete directory
-    RMDir "$INSTDIR"
+    ; Delete all application files recursively
+    RMDir /r "$INSTDIR"
     
     ; Remove registry
     DeleteRegKey HKCU "Software\OpenSeismo Lite"
