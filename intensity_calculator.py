@@ -513,6 +513,307 @@ class IntensityCalculator:
             "recommendations": get_intensity_recommendations(mmi_epicenter, shindo_epicenter, fault_type)
         }
 
+class AgencySummaryProcessor:
+    """
+    Processes intensity calculations from generalized summaries
+    from multiple seismic agencies: USGS, ESMC, CSEM, JMA
+    
+    This module decouples intensity logic from agency-specific formats,
+    allowing unified MMI/Shindo calculations regardless of data source.
+    """
+    
+    # Mapping of agency summary intensities to standardized values
+    USGS_SHAKEMAP_INTENSITY_MAP = {
+        "not_felt": 1,
+        "weak": 3,
+        "light": 4,
+        "moderate": 5,
+        "strong": 6,
+        "very_strong": 7,
+        "severe": 8,
+        "violent": 9,
+        "extreme": 10,
+    }
+    
+    # European Seismic Commission (ESMC) EMS-98 to MMI mapping
+    ESMC_EMS98_TO_MMI = {
+        "I": 1, "II": 2, "III": 3, "IV": 4, "V": 5,
+        "VI": 6, "VII": 7, "VIII": 8, "IX": 9, "X": 10,
+        "XI": 11, "XII": 12
+    }
+    
+    # CSEM (Swiss Seismological Commission) intensity mappings
+    CSEM_INTENSITY_MAP = {
+        0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6,
+        6: 7, 7: 8, 8: 9, 9: 10, 10: 11, 11: 12
+    }
+    
+    # JMA Shindo scale (already native)
+    JMA_SHINDO_NUMERIC = {
+        "0": 0, "1": 1, "2": 2, "3": 3, "4": 4,
+        "5minus": 5.0, "5plus": 5.5, 
+        "6minus": 6.0, "6plus": 6.5,
+        "7": 7.0
+    }
+    
+    @staticmethod
+    def process_usgs_summary(magnitude, depth_km, latitude, longitude, agency_summary):
+        """
+        Process USGS ShakeMap summary to calculate MMI and Shindo
+        
+        Args:
+            magnitude: Earthquake magnitude
+            depth_km: Depth in km
+            latitude: Latitude of epicenter
+            longitude: Longitude of epicenter
+            agency_summary: Dict with keys like:
+                - 'max_mmi_intensity': integer or string (I-XII)
+                - 'impact_description': string (e.g., "moderate", "severe")
+                - 'estimated_intensity_region': string
+        
+        Returns:
+            Dict with calculated MMI and Shindo values
+        """
+        fault_type, _ = IntensityCalculator.classify_fault_type(latitude, longitude, depth_km)
+        
+        # Extract max intensity from summary
+        mmi_value = 5  # Default
+        if 'max_mmi_intensity' in agency_summary:
+            val = agency_summary['max_mmi_intensity']
+            if isinstance(val, int):
+                mmi_value = val
+            elif isinstance(val, str):
+                # Handle Roman numerals or English names
+                if val.upper() in AgencySummaryProcessor.ESMC_EMS98_TO_MMI:
+                    mmi_value = AgencySummaryProcessor.ESMC_EMS98_TO_MMI[val.upper()]
+        
+        if 'impact_description' in agency_summary:
+            desc = agency_summary['impact_description'].lower()
+            if desc in AgencySummaryProcessor.USGS_SHAKEMAP_INTENSITY_MAP:
+                mmi_value = AgencySummaryProcessor.USGS_SHAKEMAP_INTENSITY_MAP[desc]
+        
+        # Calculate Shindo from MMI
+        shindo_value = IntensityCalculator.calculate_shindo(magnitude, depth_km, 0.1, fault_type)
+        
+        return {
+            "source_agency": "USGS",
+            "magnitude": magnitude,
+            "depth_km": depth_km,
+            "mmi": round(mmi_value, 2),
+            "mmi_scale": IntensityCalculator.get_mmi_scale(mmi_value).name,
+            "shindo": round(shindo_value, 2),
+            "shindo_scale": IntensityCalculator.get_shindo_scale(shindo_value).name,
+            "fault_type": fault_type.value,
+            "summary": agency_summary
+        }
+    
+    @staticmethod
+    def process_esmc_summary(magnitude, depth_km, latitude, longitude, agency_summary):
+        """
+        Process ESMC (European Seismic Commission) EMS-98 summary
+        
+        Args:
+            magnitude: Earthquake magnitude
+            depth_km: Depth in km
+            latitude: Latitude of epicenter
+            longitude: Longitude of epicenter
+            agency_summary: Dict with keys like:
+                - 'ems98_intensity': Roman numeral string (I-XII)
+                - 'damage_grade': integer (1-5)
+                - 'affected_area': string
+        
+        Returns:
+            Dict with calculated MMI and Shindo values
+        """
+        fault_type, _ = IntensityCalculator.classify_fault_type(latitude, longitude, depth_km)
+        
+        mmi_value = 5  # Default
+        
+        # Parse EMS-98 intensity
+        if 'ems98_intensity' in agency_summary:
+            ems_val = agency_summary['ems98_intensity'].upper()
+            if ems_val in AgencySummaryProcessor.ESMC_EMS98_TO_MMI:
+                mmi_value = AgencySummaryProcessor.ESMC_EMS98_TO_MMI[ems_val]
+        
+        # Map damage grade to MMI
+        if 'damage_grade' in agency_summary:
+            damage = agency_summary['damage_grade']
+            if damage == 5:
+                mmi_value = max(mmi_value, 10)  # Heavy damage maps to MMI X+
+            elif damage == 4:
+                mmi_value = max(mmi_value, 8)
+            elif damage == 3:
+                mmi_value = max(mmi_value, 6)
+            elif damage == 2:
+                mmi_value = max(mmi_value, 4)
+        
+        shindo_value = IntensityCalculator.calculate_shindo(magnitude, depth_km, 0.1, fault_type)
+        
+        return {
+            "source_agency": "ESMC",
+            "magnitude": magnitude,
+            "depth_km": depth_km,
+            "mmi": round(mmi_value, 2),
+            "mmi_scale": IntensityCalculator.get_mmi_scale(mmi_value).name,
+            "shindo": round(shindo_value, 2),
+            "shindo_scale": IntensityCalculator.get_shindo_scale(shindo_value).name,
+            "fault_type": fault_type.value,
+            "summary": agency_summary
+        }
+    
+    @staticmethod
+    def process_csem_summary(magnitude, depth_km, latitude, longitude, agency_summary):
+        """
+        Process CSEM (Swiss Seismological Commission) intensity summary
+        
+        Args:
+            magnitude: Earthquake magnitude
+            depth_km: Depth in km
+            latitude: Latitude of epicenter
+            longitude: Longitude of epicenter
+            agency_summary: Dict with keys like:
+                - 'csem_intensity': numeric intensity value
+                - 'felt_reports': count of felt reports
+                - 'macroseismic_data': dict of location intensities
+        
+        Returns:
+            Dict with calculated MMI and Shindo values
+        """
+        fault_type, _ = IntensityCalculator.classify_fault_type(latitude, longitude, depth_km)
+        
+        mmi_value = 5  # Default
+        
+        if 'csem_intensity' in agency_summary:
+            csem_int = agency_summary['csem_intensity']
+            if csem_int in AgencySummaryProcessor.CSEM_INTENSITY_MAP:
+                mmi_value = AgencySummaryProcessor.CSEM_INTENSITY_MAP[csem_int]
+        
+        # Use felt report count as confidence indicator
+        felt_count = agency_summary.get('felt_reports', 0)
+        if felt_count > 1000:
+            # High confidence in intensity from many reports
+            pass
+        elif felt_count < 10 and 'macroseismic_data' not in agency_summary:
+            # Low confidence - use calculated values instead
+            mmi_value = IntensityCalculator.calculate_mmi(magnitude, depth_km, 0.1, fault_type)
+        
+        shindo_value = IntensityCalculator.calculate_shindo(magnitude, depth_km, 0.1, fault_type)
+        
+        return {
+            "source_agency": "CSEM",
+            "magnitude": magnitude,
+            "depth_km": depth_km,
+            "mmi": round(mmi_value, 2),
+            "mmi_scale": IntensityCalculator.get_mmi_scale(mmi_value).name,
+            "shindo": round(shindo_value, 2),
+            "shindo_scale": IntensityCalculator.get_shindo_scale(shindo_value).name,
+            "fault_type": fault_type.value,
+            "felt_reports": felt_count,
+            "summary": agency_summary
+        }
+    
+    @staticmethod
+    def process_jma_summary(magnitude, depth_km, latitude, longitude, agency_summary):
+        """
+        Process JMA (Japan Meteorological Agency) Shindo intensity summary
+        
+        Args:
+            magnitude: Earthquake magnitude
+            depth_km: Depth in km
+            latitude: Latitude of epicenter
+            longitude: Longitude of epicenter
+            agency_summary: Dict with keys like:
+                - 'shindo_scale': numeric or string (0-7)
+                - 'max_shindo_location': string (prefecture name)
+                - 'estimated_seismic_intensity': string
+        
+        Returns:
+            Dict with calculated MMI and Shindo values
+        """
+        fault_type, _ = IntensityCalculator.classify_fault_type(latitude, longitude, depth_km)
+        
+        shindo_value = 3  # Default
+        
+        # Parse JMA Shindo scale
+        if 'shindo_scale' in agency_summary:
+            shindo_key = agency_summary['shindo_scale']
+            if isinstance(shindo_key, (int, float)):
+                shindo_value = float(shindo_key)
+            elif isinstance(shindo_key, str):
+                shindo_lower = shindo_key.lower().replace(" ", "")
+                if shindo_lower in AgencySummaryProcessor.JMA_SHINDO_NUMERIC:
+                    shindo_value = AgencySummaryProcessor.JMA_SHINDO_NUMERIC[shindo_lower]
+        
+        # Calculate MMI from Shindo (reverse mapping)
+        # Approximate relationship: MMI ≈ Shindo * 1.4 + 0.5
+        mmi_value = shindo_value * 1.4 + 0.5
+        mmi_value = max(1, min(12, mmi_value))  # Clamp to valid range
+        
+        return {
+            "source_agency": "JMA",
+            "magnitude": magnitude,
+            "depth_km": depth_km,
+            "mmi": round(mmi_value, 2),
+            "mmi_scale": IntensityCalculator.get_mmi_scale(mmi_value).name,
+            "shindo": round(shindo_value, 2),
+            "shindo_scale": IntensityCalculator.get_shindo_scale(shindo_value).name,
+            "fault_type": fault_type.value,
+            "summary": agency_summary
+        }
+    
+    @staticmethod
+    def process_agency_summary(agency_name, magnitude, depth_km, latitude, longitude, agency_summary):
+        """
+        Unified processor for any agency summary
+        Routes to appropriate agency processor
+        
+        Args:
+            agency_name: Name of seismic agency (USGS, ESMC, CSEM, JMA)
+            magnitude: Earthquake magnitude
+            depth_km: Depth in km
+            latitude: Latitude of epicenter
+            longitude: Longitude of epicenter
+            agency_summary: Agency-specific summary dict
+        
+        Returns:
+            Standardized dict with MMI/Shindo calculations
+        """
+        agency_name = agency_name.upper().strip()
+        
+        if agency_name == "USGS":
+            return AgencySummaryProcessor.process_usgs_summary(
+                magnitude, depth_km, latitude, longitude, agency_summary
+            )
+        elif agency_name == "ESMC":
+            return AgencySummaryProcessor.process_esmc_summary(
+                magnitude, depth_km, latitude, longitude, agency_summary
+            )
+        elif agency_name == "CSEM":
+            return AgencySummaryProcessor.process_csem_summary(
+                magnitude, depth_km, latitude, longitude, agency_summary
+            )
+        elif agency_name == "JMA":
+            return AgencySummaryProcessor.process_jma_summary(
+                magnitude, depth_km, latitude, longitude, agency_summary
+            )
+        else:
+            # Default: use direct calculations
+            fault_type, _ = IntensityCalculator.classify_fault_type(latitude, longitude, depth_km)
+            mmi = IntensityCalculator.calculate_mmi(magnitude, depth_km, 0.1, fault_type)
+            shindo = IntensityCalculator.calculate_shindo(magnitude, depth_km, 0.1, fault_type)
+            return {
+                "source_agency": agency_name,
+                "magnitude": magnitude,
+                "depth_km": depth_km,
+                "mmi": round(mmi, 2),
+                "mmi_scale": IntensityCalculator.get_mmi_scale(mmi).name,
+                "shindo": round(shindo, 2),
+                "shindo_scale": IntensityCalculator.get_shindo_scale(shindo).name,
+                "fault_type": fault_type.value,
+                "summary": agency_summary
+            }
+
+
 def get_intensity_recommendations(mmi_value, shindo_value, fault_type):
     """Generate recommendations based on intensity values"""
     recommendations = []
