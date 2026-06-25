@@ -184,7 +184,7 @@ def create_main_window():
                       orientation='h', size=(20, 15), key='MAG_THRESHOLD', enable_events=True),
              sg.Text('Volume:', font=('Arial', 9)),
              sg.Slider(range=(0, 100), default_value=70, resolution=5, 
-                      orientation='h', size=(15, 15), key='VOLUME', enable_events=True, suffix='%')],
+                      orientation='h', size=(15, 15), key='VOLUME', enable_events=True)],
             
             [sg.Button('🔇 Mute (60s)', key='MUTE_BTN', size=(12, 1)),
              sg.Button('📊 Refresh', key='REFRESH_BTN', size=(12, 1)),

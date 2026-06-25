@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenSeismo Lite - 3D Globe</title>
+    
+    <!-- Three.js for 3D Globe -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- CSS Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/globe.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/panels.css') }}">
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        #app-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Container -->
+    <div id="app-container">
+        <!-- 3D Globe Container -->
+        <div id="globe-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+
+        <!-- Earthquake Panel -->
+        <div id="earthquake-panel" class="panel" style="right: 20px; top: 20px; width: 350px; display: none;">
+            <div class="panel-header">
+                <h2>Earthquakes</h2>
+                <button class="close-btn">×</button>
+            </div>
+            <div class="panel-content">
+                <div class="stats">
+                    <div class="stat-item">
+                        <span>Detected</span>
+                        <span id="eq-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Alert Level</span>
+                        <span id="eq-alert">—</span>
+                    </div>
+                </div>
+                <div class="controls">
+                    <label>Magnitude Filter</label>
+                    <input type="range" id="magnitude-slider" min="2" max="8" value="4" step="0.5">
+                    <span id="magnitude-value">Min: 4.0</span>
+                </div>
+                <div class="earthquake-list" id="earthquake-list">
+                    <div class="empty-state">No earthquakes detected</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tsunami Panel -->
+        <div id="tsunami-panel" class="panel" style="right: 20px; top: 400px; width: 350px; display: none;">
+            <div class="panel-header">
+                <h2>Tsunami Warnings</h2>
+                <button class="close-btn">×</button>
+            </div>
+            <div class="panel-content">
+                <div class="stats">
+                    <div class="stat-item">
+                        <span>Active Warnings</span>
+                        <span id="tsunami-count">None</span>
+                    </div>
+                </div>
+                <div class="tsunami-list" id="tsunami-list">
+                    <div class="empty-state">No active tsunami warnings</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div id="control-panel" class="panel" style="left: 20px; bottom: 20px; width: 280px;">
+            <h2>⚙️ Controls</h2>
+            <div class="control-section">
+                <div class="button-group">
+                    <button id="btn-earthquakes" class="control-btn">📍 Earthquakes</button>
+                    <button id="btn-tsunami" class="control-btn">🌊 Tsunami</button>
+                </div>
+                <div class="button-group">
+                    <button id="refresh-btn" class="action-btn" style="width: 100%;">🔄 Refresh Data</button>
+                </div>
+                <div class="info-section" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,200,255,0.2);">
+                    <span class="label" style="font-size: 11px;">Last Updated</span>
+                    <span id="last-updated" style="display: block; margin-top: 3px;">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Modules in correct order -->
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/utils/format.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui/controls.js') }}"></script>
+    
+    <!-- 3D Globe (must load before main) -->
+    <script src="{{ url_for('static', filename='js/globe/globe3d.js') }}"></script>
+    
+    <!-- Seismic Monitoring -->
+    <script src="{{ url_for('static', filename='js/seismic/events.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/seismic/tsunami.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/seismic/intensity.js') }}"></script>
+    
+    <!-- App Initialization (must load last) -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

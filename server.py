@@ -202,7 +202,7 @@ def calculate_wave_arrivals(epicenter_lat, epicenter_lon, depth_km):
     
     return arrivals
 
-def get_tsunami_alert_level(warning_level_str):
+def get_alert_level(magnitude):
     """Determine alert level based on magnitude"""
     if magnitude >= 7.0:
         return "critical"
@@ -680,93 +680,6 @@ def agency_info():
             }
         },
         "note": "This endpoint allows unified processing of intensity data from multiple agencies"
-    }), 200
-
-
-@app.route("/api/intensity/info")
-def intensity_info():
-    """Get intensity scale information and descriptions"""
-    return jsonify({
-        "mmi_scale": {
-            "name": "Modified Mercalli Intensity Scale",
-            "description": "Measures the effects of earthquakes on the Earth's surface, human beings, buildings, and other structures",
-            "range": "I (not felt) to XII (total destruction)",
-            "levels": {
-                "I": {"value": 1, "description": "Not felt", "color": "#ffffff"},
-                "II": {"value": 2, "description": "Weak - Felt indoors", "color": "#ccccff"},
-                "III": {"value": 3, "description": "Weak - Felt indoors, vibrations like passing truck", "color": "#99ccff"},
-                "IV": {"value": 4, "description": "Light - Indoor objects rattle, felt outdoors", "color": "#66ccff"},
-                "V": {"value": 5, "description": "Moderate - Felt by most, some dishes break", "color": "#00ccff"},
-                "VI": {"value": 6, "description": "Strong - Felt by all, minor damage", "color": "#ffff00"},
-                "VII": {"value": 7, "description": "Very Strong - Considerable damage, everyone runs outside", "color": "#ffcc00"},
-                "VIII": {"value": 8, "description": "Severe - Structural damage, partial collapse", "color": "#ff9900"},
-                "IX": {"value": 9, "description": "Violent - Considerable damage, ground cracking", "color": "#ff6600"},
-                "X": {"value": 10, "description": "Extreme - Most buildings destroyed", "color": "#ff3300"},
-                "XI": {"value": 11, "description": "Extreme - Few buildings standing", "color": "#ff0000"},
-                "XII": {"value": 12, "description": "Extreme - Total destruction", "color": "#cc0000"}
-            }
-        },
-        "shindo_scale": {
-            "name": "Japan Meteorological Agency Shindo Scale",
-            "description": "Japanese seismic intensity scale used by the Japan Meteorological Agency",
-            "range": "0 (not felt) to 7 (extreme destruction)",
-            "levels": {
-                "0": {"value": 0, "description": "Not felt", "color": "#ffffff"},
-                "1": {"value": 1, "description": "Weak - Felt indoors", "color": "#ccccff"},
-                "2": {"value": 2, "description": "Light - Objects rattle", "color": "#66ccff"},
-                "3": {"value": 3, "description": "Moderate - Most people frightened", "color": "#00ccff"},
-                "4": {"value": 4, "description": "Strong - Most buildings slightly damaged", "color": "#ffff00"},
-                "5-": {"value": 5.0, "description": "Strong - Many buildings damaged", "color": "#ffcc00"},
-                "5+": {"value": 5.5, "description": "Strong+ - Considerable damage", "color": "#ff9900"},
-                "6-": {"value": 6.0, "description": "Very Strong - Many buildings collapse", "color": "#ff6600"},
-                "6+": {"value": 6.5, "description": "Very Strong+ - Most buildings collapse", "color": "#ff3300"},
-                "7": {"value": 7.0, "description": "Extreme - Total/near total destruction", "color": "#cc0000"}
-            }
-        },
-        "fault_zones": {
-            "subduction": {
-                "color": "#0066cc",
-                "description": "Subduction Zone - High tsunami and magnitude risk",
-                "typical_depth": "0-700 km",
-                "examples": ["Japan Trench", "Peru-Chile Trench", "Mariana Trench"]
-            },
-            "transform": {
-                "color": "#ff6600",
-                "description": "Transform Fault - Strong lateral motion",
-                "typical_depth": "0-50 km",
-                "examples": ["San Andreas Fault", "Alpine Fault (NZ)"]
-            },
-            "reverse_thrust": {
-                "color": "#cc0000",
-                "description": "Reverse-Thrust Fault - Vertical uplift, potential tsunami",
-                "typical_depth": "0-300 km",
-                "examples": ["Himalayas", "Zagros Mountains"]
-            },
-            "normal": {
-                "color": "#00cc66",
-                "description": "Normal Fault - Extensional stress",
-                "typical_depth": "0-30 km",
-                "examples": ["East African Rift"]
-            },
-            "divergent": {
-                "color": "#66ccff",
-                "description": "Divergent Boundary - Seafloor spreading",
-                "typical_depth": "0-20 km",
-                "examples": ["Mid-Atlantic Ridge", "East Pacific Rise"]
-            },
-            "convergent": {
-                "color": "#9900cc",
-                "description": "Convergent Boundary - Compression zone",
-                "typical_depth": "0-250 km",
-                "examples": ["Alpine Belt"]
-            },
-            "strike_slip": {
-                "color": "#ffcc00",
-                "description": "Strike-Slip Fault - Horizontal motion",
-                "typical_depth": "0-30 km",
-                "examples": ["San Andreas", "Dead Sea Transform"]
-            }
-        }
     }), 200
 
 
@@ -1354,123 +1267,15 @@ def live_earthquakes_stream():
     """
     Server-Sent Events (SSE) endpoint for real-time earthquake updates
     Client subscribes and receives live updates with sound alerts and tsunami warnings
+    DISABLED: Use /api/earthquakes/new-since endpoint instead to prevent spam
     """
-    def generate():
-        client_id = request.remote_addr + str(time.time())
-        previous_earthquakes = {}
-        previous_tsunamis = {}
-        
-        while True:
-            try:
-                current_earthquakes = LiveEarthquakeDetector.get_live_earthquakes(
-                    magnitude_filter=4.0,
-                    enrich=True
-                )
-                
-                # Find new earthquakes
-                current_ids = {eq['id']: eq for eq in current_earthquakes}
-                
-                for eq_id, eq_data in current_ids.items():
-                    if eq_id not in previous_earthquakes:
-                        # New earthquake detected
-                        alert_level = get_alert_level(eq_data['magnitude'])
-                        sound_config = SOUND_ALERTS.get(alert_level)
-                        
-                        # Check for tsunami warning
-                        tsunami_warning = None
-                        if eq_data['magnitude'] >= 6.5:
-                            try:
-                                tsunami_eval = TsunamiWarningSystem.evaluate_earthquake(
-                                    eq_data['magnitude'],
-                                    eq_data.get('depth', 10),
-                                    eq_data['latitude'],
-                                    eq_data['longitude']
-                                )
-                                tsunami_level = tsunami_eval.get('warning_level')
-                                tsunami_alert_key = get_tsunami_alert_level(tsunami_level)
-                                
-                                if tsunami_alert_key:
-                                    tsunami_warning = {
-                                        "level": tsunami_alert_key,
-                                        "level_name": tsunami_level,
-                                        "wave_height_m": tsunami_eval.get('wave_height_m'),
-                                        "region": tsunami_eval.get('nearest_coastal_region'),
-                                        "distance_km": tsunami_eval.get('distance_to_coast_km'),
-                                        "arrival_minutes": tsunami_eval.get('estimated_arrival_minutes'),
-                                        "sound": TSUNAMI_ALERTS.get(tsunami_alert_key) if tsunami_alert_key else None
-                                    }
-                            except Exception as e:
-                                print(f"Tsunami evaluation error: {e}")
-                        
-                        # Check for Earthquake Early Warning (EEW) - M5.0+ only
-                        eew_warning = None
-                        if eq_data['magnitude'] >= 5.0:
-                            try:
-                                arrivals = calculate_wave_arrivals(
-                                    eq_data['latitude'],
-                                    eq_data['longitude'],
-                                    eq_data.get('depth', 10)
-                                )
-                                eew_alert_level = get_eew_alert_level(eq_data['magnitude'], 30)  # Use 30km as reference
-                                eew_config = EEW_ALERTS.get(eew_alert_level)
-                                
-                                if eew_config:
-                                    eew_warning = {
-                                        "level": eew_alert_level,
-                                        "magnitude": eq_data['magnitude'],
-                                        "depth_km": eq_data.get('depth', 10),
-                                        "location": eq_data.get('place', 'Unknown'),
-                                        "arrivals": arrivals,
-                                        "sound": eew_config,
-                                        "label": "緊急地震速報",  # Earthquake Early Warning in Japanese
-                                        "description": f"M{eq_data['magnitude']} earthquake detected - Strong shaking expected in seconds"
-                                    }
-                            except Exception as e:
-                                print(f"EEW calculation error: {e}")
-                        
-                        event_data = {
-                            "type": "new_earthquake",
-                            "timestamp": datetime.utcnow().isoformat(),
-                            "earthquake": eq_data,
-                            "alert": {
-                                "level": alert_level,
-                                "sound": sound_config if sound_config else None,
-                                "notification": {
-                                    "title": f"Earthquake Alert - {alert_level.upper()}",
-                                    "body": f"Magnitude {eq_data['magnitude']} - {eq_data['place']}",
-                                    "icon": "/static/earthquake-icon.png",
-                                    "badge": "/static/earthquake-badge.png"
-                                }
-                            }
-                        }
-                        
-                        # Add tsunami warning if present
-                        if tsunami_warning:
-                            event_data["tsunami"] = tsunami_warning
-                        
-                        # Add EEW if present
-                        if eew_warning:
-                            event_data["eew"] = eew_warning
-                        
-                        yield f"data: {json.dumps(event_data)}\n\n"
-                
-                # Check for updated earthquakes (intensity or other data changed)
-                for eq_id, eq_data in current_ids.items():
-                    if eq_id in previous_earthquakes:
-                        prev_eq = previous_earthquakes[eq_id]
-                        # Check if intensity or other critical data changed
-                        if (eq_data.get('mmi') != prev_eq.get('mmi') or 
-                            eq_data.get('tsunami') != prev_eq.get('tsunami')):
-                            yield f"data: {json.dumps({'type': 'update', 'earthquake': eq_data})}\n\n"
-                
-                previous_earthquakes = current_ids
-                time.sleep(5)  # Check for updates every 5 seconds
-                
-            except Exception as e:
-                yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
-                time.sleep(5)
-    
-    return Response(generate(), mimetype='text/event-stream')
+    # This endpoint is disabled to prevent excessive polling and spam
+    # Use /api/earthquakes/new-since for polling with manual control
+    return jsonify({
+        "error": "This endpoint has been disabled to prevent excessive polling",
+        "use_instead": "/api/earthquakes/new-since",
+        "note": "Call /api/earthquakes/new-since with since_timestamp for live updates"
+    }), 200
 
 
 @app.route("/api/sound-alerts/config")
