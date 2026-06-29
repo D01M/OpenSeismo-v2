@@ -1,6 +1,6 @@
 # OpenSeismo
 
-OpenSeismo is an open-source seismic monitoring application that integrates data from official agencies and APIs, including USGS, EMSC, JMA, and CWA.
+OpenSeismo — An open-source seismic monitoring application that aggregates earthquake and tsunami data from official agencies including USGS, EMSC, JMA, and CWA.
 
 The project is free to use and modify under the MIT License.
 ## Features
