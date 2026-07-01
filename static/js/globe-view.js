@@ -6,7 +6,7 @@
 class OpenSeismoGlobeView {
   constructor(viewer) {
     this.viewer = viewer;
-    this.mode = "map";
+    this.mode = "globe";
     this.ready = false;
     this.destroyed = false;
     this.data = {
@@ -49,7 +49,7 @@ class OpenSeismoGlobeView {
       this.scheduleSync();
     };
     window.addEventListener('openseismo:live-detection', this._onLiveDetectionBound);
-    this.setMode("map");
+    this.setMode("globe");
     this.ready = true;
     this.scheduleSync();
   }

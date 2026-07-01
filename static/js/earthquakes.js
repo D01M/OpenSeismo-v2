@@ -80,7 +80,11 @@ async function refreshQuakes() {
         reviewed: p.reviewed,
         status: p.status,
         confidence: p.confidence,
-        label: p.place || "Unknown"
+        label: p.place || "Unknown",
+        source: p.sources || "USGS",
+        intensity: p.mmi ?? p.cdi ?? p.intensity,
+        mmi: p.mmi,
+        cdi: p.cdi
       };
     });
 
