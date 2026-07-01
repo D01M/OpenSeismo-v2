@@ -180,6 +180,7 @@ class OpenSeismoGlobeView {
   }
 
   sync() {
+    if (this.destroyed || this.mode !== "globe") return;
     this.syncPointLayer("stations", this.getStationMarkers());
     this.syncPointLayer("earthquakes", this.getEarthquakeMarkers());
     this.syncPointLayer("detections", this.getDetectionMarkers());
@@ -389,12 +390,12 @@ class OpenSeismoGlobeView {
       buckets.set(key, bucket);
     }
 
-    return [...buckets.values()].map((bucket, idx) => {
+    return [...buckets.entries()].map(([key, bucket]) => {
       const latitude = bucket.lat / bucket.count;
       const longitude = bucket.lon / bucket.count;
       const magnitude = bucket.magnitude || 0;
       return {
-        id: `quake-cluster:${idx}:${bucket.count}`,
+        id: `quake-cluster:${key}`,
         type: "earthquake",
         latitude,
         longitude,
