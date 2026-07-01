@@ -3,6 +3,7 @@
  */
 
 let stationEntities = [];
+let stationEntityLookup = new Map();
 
 function formatStationTime(value) {
   if (!value) return "Unknown";
@@ -49,43 +50,96 @@ function noiseColor(n) {
   return Cesium.Color.fromCssColorString("#ff3d5e");
 }
 
+function stationEntityId(station) {
+  return station?.id || `${station?.network || ""}:${station?.code || station?.name || "station"}`;
+}
+
+function buildStationTelemetry(station) {
+  const noise = Number(station.noise_level || 0);
+  const status = String(station.status || station.health || "unknown").toLowerCase();
+  const channels = Array.isArray(station.channels) ? station.channels.join(", ") : String(station.channels || "N/A");
+  return `<b>${station.code}</b> · ${station.name}<br>Network: ${station.network}<br>Status: ${status}<br>Country: ${station.country || "N/A"}<br>Region: ${station.region || "N/A"}<br>Channels: ${channels}<br>Last seen: ${formatStationTime(station.last_seen)}<br>Noise: ${fmt(noise, 1)}/100 · ${station.signal_quality || "unknown"}<br>Provider: ${station.provider || station.source || "N/A"}<br>Coverage: ${station.coverage_radius_km || "N/A"} km<br>${
+    station.arrival
+      ? `Distance: ${station.arrival.distance_km} km (${station.arrival.distance_deg}°)<br>P: ${station.arrival.p_wave_seconds}s · S: ${station.arrival.s_wave_seconds}s · Surface: ${station.arrival.surface_wave_seconds}s`
+      : "No linked M4.5+ event"
+  }`;
+}
+
+function syncStationEntities(stations, visible) {
+  const nextIds = new Set();
+  const stationList = Array.isArray(stations) ? stations : [];
+
+  stationList.forEach(station => {
+    const stationId = stationEntityId(station);
+    if (!stationId) return;
+    nextIds.add(stationId);
+
+    const existing = stationEntityLookup.get(stationId);
+    const noise = Number(station.noise_level || 0);
+    const status = String(station.status || station.health || "unknown").toLowerCase();
+    const size = Math.max(7, Math.min(22, 6 + noise / 6));
+    const color = stationColor(station, noise);
+    const telemetry = buildStationTelemetry(station);
+
+    if (existing) {
+      existing.position = Cesium.Cartesian3.fromDegrees(Number(station.lon ?? station.longitude ?? 0), Number(station.lat ?? station.latitude ?? 0), 125000);
+      existing.point.pixelSize = size;
+      existing.point.color = color;
+      existing.point.outlineColor = Cesium.Color.WHITE;
+      existing.point.outlineWidth = 1;
+      existing.point.scaleByDistance = new Cesium.NearFarScalar(1.5e6, 1.2, 2.8e7, 0.35);
+      existing.show = visible;
+      existing._telemetry = telemetry;
+      return;
+    }
+
+    const entity = addPoint(
+      Number(station.lon ?? station.longitude ?? 0),
+      Number(station.lat ?? station.latitude ?? 0),
+      125000,
+      size,
+      color,
+      Cesium.Color.WHITE,
+      telemetry,
+      stationEntities,
+      visible
+    );
+    entity._stationStatus = status;
+    stationEntityLookup.set(stationId, entity);
+  });
+
+  for (const [id, entity] of stationEntityLookup.entries()) {
+    if (!nextIds.has(id)) {
+      try {
+        viewer.entities.remove(entity);
+      } catch (_) {}
+      stationEntityLookup.delete(id);
+      const index = stationEntities.indexOf(entity);
+      if (index >= 0) stationEntities.splice(index, 1);
+    }
+  }
+}
+
 /**
  * Refresh station data from API
  */
 async function refreshStations() {
   try {
     const data = await fetchJson(`/api/stations${getStationFilters()}`);
-    clearEntities(stationEntities);
+    const visible = document.getElementById("showStations").checked;
+    const stations = data.stations || [];
+    syncStationEntities(stations, visible);
 
     let total = 0;
     let rows = [];
 
-    (data.stations || []).forEach(s => {
+    stations.forEach(s => {
       const noise = Number(s.noise_level || 0);
       const status = String(s.status || s.health || "unknown").toLowerCase();
       const channels = Array.isArray(s.channels) ? s.channels.join(", ") : String(s.channels || "N/A");
       total += noise;
-
-      const tel = `<b>${s.code}</b> · ${s.name}<br>Network: ${s.network}<br>Status: ${status}<br>Country: ${s.country || "N/A"}<br>Region: ${s.region || "N/A"}<br>Channels: ${channels}<br>Last seen: ${formatStationTime(s.last_seen)}<br>Noise: ${fmt(noise, 1)}/100 · ${s.signal_quality}<br>Provider: ${s.provider || s.source || "N/A"}<br>Coverage: ${s.coverage_radius_km || "N/A"} km<br>${
-        s.arrival
-          ? `Distance: ${s.arrival.distance_km} km (${s.arrival.distance_deg}°)<br>P: ${s.arrival.p_wave_seconds}s · S: ${s.arrival.s_wave_seconds}s · Surface: ${s.arrival.surface_wave_seconds}s`
-          : "No linked M4.5+ event"
-      }`;
-
-      addPoint(
-        s.lon,
-        s.lat,
-        125000,
-        Math.max(7, Math.min(22, 6 + noise / 6)),
-        stationColor(s, noise),
-        Cesium.Color.WHITE,
-        tel,
-        stationEntities,
-        document.getElementById("showStations").checked
-      );
-
       rows.push(
-        `<div class="item"><b>${s.code}</b> ${s.name}<br>Status ${status} · Noise ${fmt(noise, 1)} · ${s.signal_quality}<br>${
+        `<div class="item"><b>${s.code}</b> ${s.name}<br>Status ${status} · Noise ${fmt(noise, 1)} · ${s.signal_quality || "unknown"}<br>${
           s.arrival
             ? `P ${s.arrival.p_wave_seconds}s / S ${s.arrival.s_wave_seconds}s`
             : "No linked event"
@@ -94,22 +148,28 @@ async function refreshStations() {
     });
 
     if (window.openSeismoGlobeView) {
-      window.openSeismoGlobeView.setStations((data.stations || []).map(s => ({
-        id: s.code,
+      window.openSeismoGlobeView.setStations(stations.map(s => ({
+        id: s.id || `${s.network || ""}:${s.code || s.name}`,
         code: s.code,
         name: s.name,
         network: s.network,
         country: s.country,
-        health: s.health,
+        region: s.region,
+        status: s.status || s.health,
+        channels: s.channels || [],
+        provider: s.provider || s.source,
+        last_seen: s.last_seen,
         noise_level: s.noise_level,
         signal_quality: s.signal_quality,
-        lat: s.lat,
-        lon: s.lon,
-        lastUpdated: s.lastUpdated || null
+        latitude: s.latitude ?? s.lat,
+        longitude: s.longitude ?? s.lon,
+        lat: s.latitude ?? s.lat,
+        lon: s.longitude ?? s.lon,
+        lastUpdated: s.last_seen || s.lastUpdated || null
       })));
     }
 
-    document.getElementById("stationCount").textContent = data.stations?.length || 0;
+    document.getElementById("stationCount").textContent = stations.length || 0;
     document.getElementById("stationList").innerHTML = rows.join("") || "No stations.";
   } catch (e) {
     console.error(e);
