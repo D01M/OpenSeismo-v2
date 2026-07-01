@@ -505,7 +505,9 @@ class OpenSeismoGlobeView {
   }
 
   _onClick(click) {
+    console.log("_onClick fired! click.position:", click.position);
     const picked = this.viewer.scene.pick(click.position);
+    console.log("picked result:", picked);
     const primitiveMarker = picked && picked.primitive && picked.primitive._markerData ? picked.primitive._markerData : null;
     const entity = picked && picked.id ? picked.id : null;
     const entityEventData = entity && entity._eventData ? entity._eventData : null;
