@@ -498,7 +498,25 @@ class OpenSeismoGlobeView {
 
   _onClick(click) {
     const picked = this.viewer.scene.pick(click.position);
-    const marker = picked && picked.primitive && picked.primitive._markerData ? picked.primitive._markerData : null;
+    const primitiveMarker = picked && picked.primitive && picked.primitive._markerData ? picked.primitive._markerData : null;
+    const entity = picked && picked.id ? picked.id : null;
+    const entityEventData = entity && entity._eventData ? entity._eventData : null;
+    const legacyMarker = entityEventData ? {
+      id: entity.id || entityEventData.id || `quake:${entityEventData.lat}:${entityEventData.lon}`,
+      type: "earthquake",
+      latitude: entityEventData.lat ?? entityEventData.latitude,
+      longitude: entityEventData.lon ?? entityEventData.longitude,
+      magnitude: entityEventData.mag ?? entityEventData.magnitude,
+      depth: entityEventData.depth ?? entityEventData.depth_km,
+      status: entityEventData.status,
+      confidence: entityEventData.confidence,
+      label: entityEventData.label || entityEventData.place || "Earthquake",
+      place: entityEventData.place || entityEventData.label || "Unknown region",
+      source: entityEventData.source || entityEventData.sources || "USGS",
+      intensity: entityEventData.intensity ?? entityEventData.mmi ?? entityEventData.cdi,
+      lastUpdated: entityEventData.time || entityEventData.lastUpdated
+    } : null;
+    const marker = primitiveMarker || legacyMarker;
     if (!marker) return;
 
     const now = Date.now();
@@ -506,7 +524,10 @@ class OpenSeismoGlobeView {
     this.lastClick = { id: marker.id, time: now };
 
     const telemetry = document.getElementById("telemetry");
-    if (telemetry) telemetry.innerHTML = this.tooltipHtml(marker, true);
+    const statusText = document.getElementById("statusText");
+    const infoHtml = this.tooltipHtml(marker, true);
+    if (telemetry) telemetry.innerHTML = infoHtml;
+    if (statusText) statusText.innerHTML = `<span class="ok">Earthquake</span> · ${infoHtml.replace(/<br>/g, ' · ')}`;
 
     if (marker.type === "earthquake" && typeof drawWaves === "function") {
       const event = this.data.earthquakes.find(item => (item.id || item.event_id) === marker.id) || marker;
@@ -516,8 +537,8 @@ class OpenSeismoGlobeView {
           lon: event.longitude,
           depth: event.depth || event.depth_km || 10,
           mag: event.magnitude || 0,
-          place: event.label || event.region || "Unknown",
-          time: event.lastUpdated
+          place: event.label || event.region || event.place || "Unknown",
+          time: event.lastUpdated || event.time || event.time_utc
         };
         drawWaves(selectedEventForWaves);
       }
@@ -553,7 +574,10 @@ class OpenSeismoGlobeView {
       return `<b>${marker.label || "Alert"}</b><br>Status: ${marker.status || "automatic"}<br>Confidence: ${marker.confidence ?? "N/A"}`;
     }
 
-    return `<b>${marker.label || "Earthquake"}</b><br>M${Number(marker.magnitude || 0).toFixed(1)} · Depth ${marker.depth ?? marker.depth_km ?? "N/A"} km<br>Status: ${marker.status || "unreviewed"}<br>Confidence: ${marker.confidence ?? "N/A"}${full ? `<br>Time: ${marker.lastUpdated || "N/A"}` : ""}`;
+    const place = marker.place || marker.label || "Unknown region";
+    const source = marker.source || marker.sources || "USGS";
+    const intensity = marker.intensity != null ? `Intensity: ${Number(marker.intensity).toFixed(1)}` : "";
+    return `<b>${marker.label || "Earthquake"}</b><br>${place}<br>M${Number(marker.magnitude || 0).toFixed(1)} · Depth ${marker.depth ?? marker.depth_km ?? "N/A"} km<br>Status: ${marker.status || "unreviewed"}<br>Confidence: ${marker.confidence ?? "N/A"}${full ? `<br>Time: ${marker.lastUpdated || "N/A"}<br>Source: ${source}${intensity ? `<br>${intensity}` : ""}` : intensity ? `<br>${intensity}` : ""}`;
   }
 }
 
