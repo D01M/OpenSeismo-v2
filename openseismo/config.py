@@ -25,7 +25,7 @@ TEMPLATES_DIR = APP_ROOT / "templates"
 DATA_DIR = APP_ROOT / "data"
 
 # Flask configuration
-FLASK_HOST = "127.0.0.1"
+FLASK_HOST = "0.0.0.0"
 FLASK_PORT = 5000
 FLASK_DEBUG = False
 JSON_SORT_KEYS = False

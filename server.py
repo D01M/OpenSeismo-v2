@@ -1411,7 +1411,7 @@ if __name__ == "__main__":
     # CRITICAL: Never use debug=True or use_reloader=True in production builds
     # These cause infinite tab spawning in PyInstaller executables
     app.run(
-        host="127.0.0.1", 
+        host="0.0.0.0", 
         port=5000, 
         debug=False,           # MUST be False
         use_reloader=False,    # MUST be False
