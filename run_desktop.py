@@ -26,29 +26,33 @@ def acquire_lock():
     """Try to acquire a lock to prevent multiple launches"""
     global LOCK_FILE
     LOCK_FILE = get_lock_file()
-    
-    # Check if lock file exists and if process is still running
+
+    # If the lock file exists, treat it as stale unless it is from a still-active process.
     if LOCK_FILE.exists():
         try:
-            with open(LOCK_FILE, 'r') as f:
+            with open(LOCK_FILE, 'r', encoding='utf-8') as f:
                 old_pid = f.read().strip()
-                # On Windows, checking PID is unreliable, use file age instead
-                import time as time_module
-                file_age = time_module.time() - LOCK_FILE.stat().st_mtime
-                if file_age > 10:  # If lock is older than 10 seconds, consider it stale
-                    LOCK_FILE.unlink()
-        except:
-            pass
-    
+            if old_pid.isdigit():
+                try:
+                    os.kill(int(old_pid), 0)
+                except OSError:
+                    LOCK_FILE.unlink(missing_ok=True)
+                else:
+                    return False
+            else:
+                LOCK_FILE.unlink(missing_ok=True)
+        except Exception:
+            LOCK_FILE.unlink(missing_ok=True)
+
     # Try to create lock file
     if not LOCK_FILE.exists():
         try:
-            with open(LOCK_FILE, 'w') as f:
+            with open(LOCK_FILE, 'w', encoding='utf-8') as f:
                 f.write(str(os.getpid()))
             return True
-        except:
+        except Exception:
             return False
-    
+
     return False
 
 

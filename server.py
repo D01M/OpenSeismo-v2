@@ -1,9 +1,10 @@
-from flask import Flask, Response, send_from_directory, request, jsonify
+from flask import Flask, Response, send_from_directory, request, jsonify, render_template
 import requests
 import json
 import os
 import threading
 import time
+from pathlib import Path
 from datetime import datetime, timedelta
 from tsunami_warning import TsunamiWarningSystem, format_tsunami_report
 from intensity_calculator import IntensityCalculator, FaultType, AgencySummaryProcessor
@@ -11,7 +12,18 @@ from location_search import LocationSearcher
 from live_earthquake_detector import LiveEarthquakeDetector
 from openseismo.stations.station_manager import StationManager
 
-app = Flask(__name__, static_folder="static", static_url_path="/static")
+BASE_DIR = Path(__file__).resolve().parent
+PACKAGE_ROOT = BASE_DIR / "openseismo"
+STATIC_DIR = PACKAGE_ROOT / "static"
+TEMPLATES_DIR = PACKAGE_ROOT / "templates"
+
+app = Flask(
+    __name__,
+    static_folder=str(STATIC_DIR),
+    static_url_path="/static",
+    template_folder=str(TEMPLATES_DIR)
+)
+app.config['ASSET_VERSION'] = 'v2'
 
 station_manager = StationManager()
 
@@ -238,13 +250,11 @@ def generate_sound_data(frequency, duration_ms):
 
 @app.route("/")
 def index():
-    return send_from_directory("templates", "index.html")
+    return render_template("index.html", asset_version=app.config['ASSET_VERSION'])
 
 @app.route("/<path:filename>")
 def serve_static(filename):
-    """Serve static files (JS, CSS, etc)"""
-    if os.path.exists(os.path.join(".", filename)):
-        return send_from_directory(".", filename)
+    """Block legacy root-level file serving and keep the app on the package frontend only."""
     return jsonify({"error": "Not found"}), 404
 
 @app.route("/proxy/stations/iris")

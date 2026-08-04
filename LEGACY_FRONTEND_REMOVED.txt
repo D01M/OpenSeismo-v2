@@ -1,0 +1,1 @@
+This project uses openseismo/templates and openseismo/static as the only frontend source of truth. Do not reintroduce duplicate frontend roots.

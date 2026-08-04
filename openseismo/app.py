@@ -8,6 +8,9 @@ from pathlib import Path
 import sys
 import logging
 
+
+APP_ROOT = Path(__file__).resolve().parent
+
 # App initialization
 from .config import (
     APP_NAME, APP_VERSION, STATIC_DIR, TEMPLATES_DIR,
@@ -29,6 +32,7 @@ def create_app():
     # Configuration
     app.config['JSON_SORT_KEYS'] = False
     app.config['JSONIFY_PRETTYPRINT_REGULAR'] = FLASK_DEBUG
+    app.config['ASSET_VERSION'] = APP_VERSION
     
     # Logging
     if not FLASK_DEBUG:
@@ -49,7 +53,7 @@ def create_app():
     @app.route('/')
     def index():
         """Serve main application page with 3D Globe"""
-        return render_template('index.html')
+        return render_template('index.html', asset_version=app.config['ASSET_VERSION'])
     
     @app.route('/api/app-info')
     def app_info():
