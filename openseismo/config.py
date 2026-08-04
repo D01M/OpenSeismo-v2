@@ -108,6 +108,42 @@ TSUNAMI_ALERTS = {
     }
 }
 
+EEW_ALERTS = {
+    "level1": {
+        "type": "beep_sequence",
+        "pattern": "rapid_beeps",
+        "frequency": 1000,
+        "beep_duration_ms": 150,
+        "interval_ms": 100,
+        "beep_count": 5,
+        "volume": 1.0,
+        "description": "EEW Alert - Weak Shaking Expected",
+        "label": "緊急地震速報（警報）"
+    },
+    "level2": {
+        "type": "beep_sequence",
+        "pattern": "rapid_beeps",
+        "frequency": 1200,
+        "beep_duration_ms": 200,
+        "interval_ms": 80,
+        "beep_count": 7,
+        "volume": 1.0,
+        "description": "EEW Alert - Moderate Shaking Expected",
+        "label": "緊急地震速報（警報）"
+    },
+    "level3": {
+        "type": "beep_sequence",
+        "pattern": "rapid_beeps",
+        "frequency": 1400,
+        "beep_duration_ms": 250,
+        "interval_ms": 60,
+        "beep_count": 10,
+        "volume": 1.0,
+        "description": "EEW Alert - Strong/Severe Shaking Expected",
+        "label": "緊急地震速報（警報）"
+    }
+}
+
 # Map configuration
 MAP_CENTER_LAT = 20.0
 MAP_CENTER_LON = 140.0

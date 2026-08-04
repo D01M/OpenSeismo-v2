@@ -3,7 +3,7 @@ OpenSeismo Lite - Main Flask Application
 Starts the Flask server and serves the web interface
 """
 
-from flask import Flask, send_from_directory, render_template
+from flask import Flask, request, render_template
 from pathlib import Path
 import sys
 import logging
@@ -35,12 +35,15 @@ def create_app():
         logging.getLogger('werkzeug').setLevel(logging.ERROR)
     
     # Register blueprints (route modules)
-    from .routes import earthquakes, tsunami, intensity, location
-    
+    from .routes import alerts, earthquakes, intensity, location, metadata, stations, tsunami
+
     app.register_blueprint(earthquakes.bp)
     app.register_blueprint(tsunami.bp)
     app.register_blueprint(intensity.bp)
     app.register_blueprint(location.bp)
+    app.register_blueprint(stations.bp)
+    app.register_blueprint(metadata.bp)
+    app.register_blueprint(alerts.bp)
     
     # Root routes
     @app.route('/')
@@ -60,11 +63,13 @@ def create_app():
     @app.errorhandler(404)
     def not_found(error):
         """Handle 404 errors"""
+        app.logger.warning('404 for %s', request.path)
         return {'error': 'Not found'}, 404
     
     @app.errorhandler(500)
     def server_error(error):
         """Handle 500 errors"""
+        app.logger.exception('Unhandled server error for %s', request.path)
         return {'error': 'Server error'}, 500
     
     return app

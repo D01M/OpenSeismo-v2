@@ -19,7 +19,7 @@ def print_section(title):
     print(f"  {title}")
     print("="*70)
 
-def test_scenario(name, magnitude, depth_km, latitude, longitude, distances=None):
+def run_scenario(name, magnitude, depth_km, latitude, longitude, distances=None):
     """Test a specific earthquake scenario"""
     print_section(name)
     print(f"Magnitude: {magnitude}")
@@ -64,7 +64,7 @@ def test_historical_earthquakes():
     print("╚" + "="*68 + "╝")
     
     # 2011 Japan (Tohoku) - Subduction
-    test_scenario(
+    run_scenario(
         "2011 Tōhoku Earthquake (Japan) - M9.1 Subduction",
         magnitude=9.1,
         depth_km=24,
@@ -74,7 +74,7 @@ def test_historical_earthquakes():
     )
     
     # 1995 Kobe - Strike-slip (Near surface)
-    test_scenario(
+    run_scenario(
         "1995 Kobe Earthquake (Japan) - M7.3 Strike-Slip",
         magnitude=7.3,
         depth_km=16,
@@ -84,7 +84,7 @@ def test_historical_earthquakes():
     )
     
     # 2010 Chile - Subduction
-    test_scenario(
+    run_scenario(
         "2010 Chilean Earthquake - M8.8 Subduction",
         magnitude=8.8,
         depth_km=35,
@@ -94,7 +94,7 @@ def test_historical_earthquakes():
     )
     
     # 1906 San Francisco - Transform
-    test_scenario(
+    run_scenario(
         "1906 San Francisco - M7.9 Transform Fault",
         magnitude=7.9,
         depth_km=12,
@@ -104,7 +104,7 @@ def test_historical_earthquakes():
     )
     
     # Recent Papua New Guinea - Deep Subduction
-    test_scenario(
+    run_scenario(
         "2018 Papua New Guinea - M7.5 Deep Subduction",
         magnitude=7.5,
         depth_km=580,
